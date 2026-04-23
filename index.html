@@ -1,78 +1,171 @@
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Checker PRO Step 2</title>
+<title>Blacklist Checker</title>
 
 <style>
-body{background:#0f172a;color:white;font-family:Arial;text-align:center}
-textarea{width:80%;height:120px;margin:10px;background:#020617;color:white}
-button{padding:10px;margin:5px;background:#38bdf8;border:none}
-table{margin:auto;margin-top:20px;border-collapse:collapse;width:80%}
-td,th{border:1px solid #334155;padding:8px}
+body {
+  background:#0f172a;
+  color:white;
+  font-family:Arial;
+  padding:20px;
+}
+
+h1 {
+  text-align:center;
+  color:#38bdf8;
+}
+
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
+}
+
+.card {
+  background:#1e293b;
+  padding:15px;
+  border-radius:12px;
+}
+
+textarea {
+  width:100%;
+  height:120px;
+  background:#020617;
+  color:white;
+  border:none;
+  padding:10px;
+  margin-top:10px;
+}
+
+button {
+  margin-top:10px;
+  padding:10px;
+  width:100%;
+  background:#38bdf8;
+  border:none;
+  cursor:pointer;
+}
+
+.result {
+  margin-top:10px;
+  background:#020617;
+  padding:15px;
+  border-radius:10px;
+  font-size:14px;
+  line-height:1.8;
+}
 </style>
 
 </head>
 
 <body>
 
-<h1>Checker PRO</h1>
+<h1>Blacklist Checker</h1>
 
-<textarea id="ips">8.8.8.8
-1.1.1.1</textarea><br>
+<div class="grid">
 
-<button onclick="run()">Check</button> <button onclick="copy()">Copy</button> <button onclick="download()">Export</button>
+<!-- GROUP C -->
 
-<div id="result"></div>
+<div class="card">
+<h3>Group C</h3>
+<textarea id="ips_C"></textarea>
+<textarea id="domains_C"></textarea>
+<button onclick="run('C')">Check C</button>
+<div id="result_C" class="result"></div>
+</div>
+
+<!-- GROUP B -->
+
+<div class="card">
+<h3>Group B</h3>
+<textarea id="ips_B"></textarea>
+<textarea id="domains_B"></textarea>
+<button onclick="run('B')">Check B</button>
+<div id="result_B" class="result"></div>
+</div>
+
+<!-- GROUP ALL -->
+
+<div class="card">
+<h3>Group ALL</h3>
+<button onclick="runAll()">Check ALL</button>
+<div id="result_ALL" class="result"></div>
+</div>
+
+</div>
 
 <script>
 
-let DATA = [];
+function parse(text){
+  return text.split(/\n|,|;|\s+/).map(x=>x.trim()).filter(x=>x);
+}
 
-function run(){
-  let ips = document.getElementById("ips").value.split("\n");
+// 🔥 LOGIC ديال النتائج
+function process(ips, domains){
 
-  DATA = [];
-
-  let html = "<table><tr><th>IP</th><th>Status</th></tr>";
+  let res = {
+    css:0, xbl:0, pbl:0, sbl:0, barracuda:0, clean:0, dbl:0
+  };
 
   ips.forEach(ip=>{
-    ip = ip.trim();
-    if(!ip) return;
-
     let r = Math.random();
-    let type = "Clean";
 
-    if(r>0.8) type="SBL";
-    else if(r>0.6) type="XBL";
-    else if(r>0.4) type="CSS";
-
-    DATA.push(ip+" - "+type);
-
-    html += "<tr><td>"+ip+"</td><td>"+type+"</td></tr>";
+    if(r>0.85) res.sbl++;
+    else if(r>0.7) res.xbl++;
+    else if(r>0.55) res.css++;
+    else if(r>0.4) res.pbl++;
+    else if(r>0.25) res.barracuda++;
+    else res.clean++;
   });
 
-  html += "</table>";
+  domains.forEach(d=>{
+    if(Math.random()>0.6) res.dbl++;
+  });
 
-  document.getElementById("result").innerHTML = html;
+  return res;
 }
 
-function copy(){
-  if(DATA.length==0){ alert("no data"); return; }
-  navigator.clipboard.writeText(DATA.join("\n"));
-  alert("copied");
+// 🔥 عرض النتائج (نفس الشكل ديالك)
+function render(res, target){
+
+  document.getElementById(target).innerHTML = `
+🟤 CSS : ${res.css}<br>
+🟠 XBL : ${res.xbl}<br>
+🔵 PBL : ${res.pbl}<br>
+🔴 SBL : ${res.sbl}<br>
+🟢 Barracuda : ${res.barracuda}<br><br>
+
+✅ Clean : ${res.clean}<br>
+🌐 DBL : ${res.dbl}
+  `;
 }
 
-function download(){
-  if(DATA.length==0){ alert("no data"); return; }
+// check group
+function run(group){
+  let ips = parse(document.getElementById("ips_"+group).value);
+  let domains = parse(document.getElementById("domains_"+group).value);
 
-  let blob = new Blob([DATA.join("\n")],{type:"text/plain"});
-  let a = document.createElement("a");
+  let res = process(ips, domains);
+  render(res, "result_"+group);
+}
 
-  a.href = URL.createObjectURL(blob);
-  a.download = "result.txt";
-  a.click();
+// check ALL
+function runAll(){
+  let ips = [
+    ...parse(document.getElementById("ips_C").value),
+    ...parse(document.getElementById("ips_B").value)
+  ];
+
+  let domains = [
+    ...parse(document.getElementById("domains_C").value),
+    ...parse(document.getElementById("domains_B").value)
+  ];
+
+  let res = process(ips, domains);
+  render(res, "result_ALL");
 }
 
 </script>
