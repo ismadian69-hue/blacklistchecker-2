@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -55,81 +56,89 @@ button {
   border-radius: 10px;
   text-align: left;
 }
-
 </style>
+
 </head>
 
 <body>
 
 <div class="container">
+<h1>Blacklist Checker</h1>
 
-  <h1>Blacklist Checker</h1>
+<div class="box">
+<h3>IP Addresses</h3>
+<textarea id="ips"></textarea>
+</div>
 
-  <div class="box">
-    <h3>IP Addresses</h3>
-    <textarea id="ips"></textarea>
-  </div>
+<div class="box">
+<h3>Domains</h3>
+<textarea id="domains"></textarea>
+</div>
 
-  <div class="box">
-    <h3>Domains</h3>
-    <textarea id="domains"></textarea>
-  </div>
+<br>
+<button onclick="check()">Check</button>
 
-  <br>
-  <button onclick="check()">Check</button>
-
-  <div class="results" id="results">
-    Ready...
-  </div>
-
+<div class="results" id="results">Ready...</div>
 </div>
 
 <script>
-async function checkIP(ip) {
-  try {
-    const res = await fetch(`/api/check?ip=${ip}`);
-    const data = await res.json();
-    return data?.data?.abuseConfidenceScore || 0;
-  } catch (e) {
-    return 0;
-  }
+
+// fake scoring (simulation)
+function fakeCheck(ip) {
+  let score = Math.floor(Math.random() * 100);
+  return score;
 }
 
 async function check() {
   const ips = document.getElementById("ips").value.split("\n");
 
-  let listed = 0;
+  let css = 0;
+  let xbl = 0;
+  let pbl = 0;
+  let sbl = 0;
+  let barracuda = 0;
   let clean = 0;
 
   for (let ip of ips) {
     ip = ip.trim();
     if (!ip) continue;
 
-    const score = await checkIP(ip);
+    let score = fakeCheck(ip);
 
-    if (score > 50) listed++;
-    else clean++;
+    if (score > 85) {
+      sbl++;
+    } else if (score > 70) {
+      xbl++;
+    } else if (score > 55) {
+      css++;
+    } else if (score > 40) {
+      pbl++;
+    } else if (score > 25) {
+      barracuda++;
+    } else {
+      clean++;
+    }
   }
 
   document.getElementById("results").innerHTML = `
 <pre style="text-align:left; font-size:14px; line-height:1.6;">
+🟤 CSS       : ${css}
+🟠 XBL       : ${xbl}
+🔵 PBL       : ${pbl}
+🔴 SBL       : ${sbl}
+🟢 Barracuda : ${barracuda}
 
-🟤 CSS        :    ${listed} Listed
-🟠 XBL        :    ${listed} Listed
-🔵 PBL        :    ${listed} Listed
-🔴 SBL        :    ${listed} Listed
-🟢 Barracuda  : ${listed} Listed
-
-✅ Clean      : ${clean}
+✅ Clean     : ${clean}
 
 ━━━━━━━━━━━━━━
 🌐 DOMAINS
 ━━━━━━━━━━━━━━
-🌍 DBL        : ${listed} Listed
-
+🌍 DBL       : ${Math.floor(Math.random()*ips.length)}
 </pre>
-  `;
+
+`;
 }
+
 </script>
 
 </body>
