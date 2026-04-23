@@ -55,6 +55,8 @@ button {
   background: #020617;
   border-radius: 10px;
   text-align: left;
+  font-size: 14px;
+  line-height: 1.6;
 }
 </style>
 
@@ -67,29 +69,27 @@ button {
 
 <div class="box">
 <h3>IP Addresses</h3>
-<textarea id="ips"></textarea>
+<textarea id="ips" placeholder="8.8.8.8&#10;1.1.1.1"></textarea>
 </div>
 
 <div class="box">
 <h3>Domains</h3>
-<textarea id="domains"></textarea>
+<textarea id="domains" placeholder="example.com"></textarea>
 </div>
 
 <br>
 <button onclick="check()">Check</button>
 
-<div class="results" id="results">Ready...</div>
+<div class="results" id="results">Ready to scan...</div>
 </div>
 
 <script>
 
-// fake scoring (simulation)
-function fakeCheck(ip) {
-  let score = Math.floor(Math.random() * 100);
-  return score;
+function fakeScore() {
+  return Math.floor(Math.random() * 100);
 }
 
-async function check() {
+function check() {
   const ips = document.getElementById("ips").value.split("\n");
 
   let css = 0;
@@ -99,11 +99,11 @@ async function check() {
   let barracuda = 0;
   let clean = 0;
 
-  for (let ip of ips) {
+  ips.forEach(ip => {
     ip = ip.trim();
-    if (!ip) continue;
+    if (!ip) return;
 
-    let score = fakeCheck(ip);
+    let score = fakeScore();
 
     if (score > 85) {
       sbl++;
@@ -118,24 +118,21 @@ async function check() {
     } else {
       clean++;
     }
-  }
+  });
 
   document.getElementById("results").innerHTML = `
-<pre style="text-align:left; font-size:14px; line-height:1.6;">
-🟤 CSS       : ${css}
-🟠 XBL       : ${xbl}
-🔵 PBL       : ${pbl}
-🔴 SBL       : ${sbl}
-🟢 Barracuda : ${barracuda}
+🟤 CSS       : ${css}<br>
+🟠 XBL       : ${xbl}<br>
+🔵 PBL       : ${pbl}<br>
+🔴 SBL       : ${sbl}<br>
+🟢 Barracuda : ${barracuda}<br><br>
 
-✅ Clean     : ${clean}
+✅ Clean     : ${clean}<br>
 
-━━━━━━━━━━━━━━
-🌐 DOMAINS
-━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━<br>
+🌐 DOMAINS<br>
+━━━━━━━━━━━━━━<br>
 🌍 DBL       : ${Math.floor(Math.random()*ips.length)}
-</pre>
-
 `;
 }
 
