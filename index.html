@@ -1,142 +1,177 @@
-<!DOCTYPE html>
+import os
+import ipaddress
+import dns.resolver
+import dns.exception
+import requests
+from flask import Flask, jsonify
 
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Blacklist Checker</title>
+app = Flask(__name__)
 
-<style>
-body {
-  background: #0b1220;
-  font-family: Arial;
-  color: white;
-  text-align: center;
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+ZEN_ZONE = "zen.spamhaus.org"
+DBL_ZONE = "dbl.spamhaus.org"
+
+ZEN_CODE_MAP = {
+    "127.0.0.2": "SBL",
+    "127.0.0.3": "CSS",
+    "127.0.0.4": "XBL",
+    "127.0.0.9": "SBL",
+    "127.0.0.10": "PBL",
+    "127.0.0.11": "PBL",
 }
 
-.container {
-  width: 80%;
-  margin: auto;
-}
+def read_list(file_path: str) -> list[str]:
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    except FileNotFoundError:
+        return []
 
-h1 {
-  color: #38bdf8;
-}
+def is_ipv4(value: str) -> bool:
+    try:
+        return isinstance(ipaddress.ip_address(value), ipaddress.IPv4Address)
+    except ValueError:
+        return False
 
-.box {
-  display: inline-block;
-  width: 40%;
-  margin: 10px;
-  padding: 15px;
-  background: #1e293b;
-  border-radius: 10px;
-}
+def is_domain(value: str) -> bool:
+    if not value or len(value) > 253:
+        return False
 
-textarea {
-  width: 90%;
-  height: 150px;
-  background: #020617;
-  color: white;
-  border: none;
-  padding: 10px;
-}
+    value = value.strip().lower().strip(".")
+    parts = value.split(".")
 
-button {
-  margin-top: 20px;
-  padding: 10px 30px;
-  background: #38bdf8;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
+    if len(parts) < 2:
+        return False
 
-.results {
-  margin-top: 30px;
-  padding: 20px;
-  background: #020617;
-  border-radius: 10px;
-  text-align: left;
-  font-size: 14px;
-  line-height: 1.6;
-}
-</style>
+    for part in parts:
+        if not part or len(part) > 63:
+            return False
+        if part.startswith("-") or part.endswith("-"):
+            return False
 
-</head>
+    return True
 
-<body>
+def reverse_ipv4(ip: str) -> str:
+    return ".".join(reversed(ip.split(".")))
 
-<div class="container">
-<h1>Blacklist Checker</h1>
+def dns_a_lookup(name: str) -> list[str]:
+    try:
+        answers = dns.resolver.resolve(name, "A")
+        return [r.to_text() for r in answers]
+    except (
+        dns.resolver.NXDOMAIN,
+        dns.resolver.NoAnswer,
+        dns.resolver.NoNameservers,
+        dns.exception.Timeout,
+        ValueError
+    ):
+        return []
 
-<div class="box">
-<h3>IP Addresses</h3>
-<textarea id="ips" placeholder="8.8.8.8&#10;1.1.1.1"></textarea>
-</div>
+def check_ip_spamhaus(ip: str) -> dict:
+    result = {"SBL": False, "CSS": False, "XBL": False, "PBL": False}
 
-<div class="box">
-<h3>Domains</h3>
-<textarea id="domains" placeholder="example.com"></textarea>
-</div>
+    if not is_ipv4(ip):
+        return result
 
-<br>
-<button onclick="check()">Check</button>
+    query = f"{reverse_ipv4(ip)}.{ZEN_ZONE}"
+    codes = dns_a_lookup(query)
 
-<div class="results" id="results">Ready to scan...</div>
-</div>
+    for code in codes:
+        if not code.startswith("127.0.0."):
+            continue
+        list_name = ZEN_CODE_MAP.get(code)
+        if list_name:
+            result[list_name] = True
 
-<script>
+    return result
 
-function fakeScore() {
-  return Math.floor(Math.random() * 100);
-}
+def check_domain_dbl(domain: str) -> bool:
+    if not is_domain(domain):
+        return False
 
-function check() {
-  const ips = document.getElementById("ips").value.split("\n");
+    domain = domain.strip().lower().strip(".")
+    query = f"{domain}.{DBL_ZONE}"
+    codes = dns_a_lookup(query)
 
-  let css = 0;
-  let xbl = 0;
-  let pbl = 0;
-  let sbl = 0;
-  let barracuda = 0;
-  let clean = 0;
+    for code in codes:
+        if code.startswith("127.0.1."):
+            return True
 
-  ips.forEach(ip => {
-    ip = ip.trim();
-    if (!ip) return;
+    return False
 
-    let score = fakeScore();
+def build_result() -> str:
+    ips = read_list("ips.txt")
+    domains = read_list("domains.txt")
 
-    if (score > 85) {
-      sbl++;
-    } else if (score > 70) {
-      xbl++;
-    } else if (score > 55) {
-      css++;
-    } else if (score > 40) {
-      pbl++;
-    } else if (score > 25) {
-      barracuda++;
-    } else {
-      clean++;
+    counts = {
+        "CSS": 0,
+        "XBL": 0,
+        "PBL": 0,
+        "SBL": 0,
+        "Clean": 0,
     }
-  });
 
-  document.getElementById("results").innerHTML = `
-🟤 CSS       : ${css}<br>
-🟠 XBL       : ${xbl}<br>
-🔵 PBL       : ${pbl}<br>
-🔴 SBL       : ${sbl}<br>
-🟢 Barracuda : ${barracuda}<br><br>
+    dbl_count = 0
 
-✅ Clean     : ${clean}<br>
+    valid_ips = [ip for ip in ips if is_ipv4(ip)]
+    valid_domains = [domain for domain in domains if is_domain(domain)]
 
-━━━━━━━━━━━━━━<br>
-🌐 DOMAINS<br>
-━━━━━━━━━━━━━━<br>
-🌍 DBL       : ${Math.floor(Math.random()*ips.length)}
-`;
-}
+    for ip in valid_ips:
+        res = check_ip_spamhaus(ip)
+        listed = False
 
-</script>
+        for key in ["CSS", "XBL", "PBL", "SBL"]:
+            if res[key]:
+                counts[key] += 1
+                listed = True
 
-</body>
-</html>
+        if not listed:
+            counts["Clean"] += 1
+
+    for domain in valid_domains:
+        if check_domain_dbl(domain):
+            dbl_count += 1
+
+    return f"""🟤 CSS        : {counts['CSS']} Listed
+🟠 XBL        : {counts['XBL']} Listed
+🔵 PBL        : {counts['PBL']} Listed
+🔴 SBL        : {counts['SBL']} Listed
+✅ Clean      : {counts['Clean']}
+
+━━━━━━━━━━━━━━
+🌐 DOMAINS
+━━━━━━━━━━━━━━
+🌍 DBL        : {dbl_count} Listed"""
+
+@app.route("/api/cron", methods=["GET"])
+def run_cron():
+    if not BOT_TOKEN or not CHAT_ID:
+        return jsonify({
+            "ok": False,
+            "error": "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID"
+        }), 500
+
+    text = build_result()
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    res = requests.post(
+        url,
+        json={
+            "chat_id": CHAT_ID,
+            "text": text
+        },
+        timeout=30
+    )
+
+    try:
+        response_json = res.json()
+    except Exception:
+        response_json = {"raw": res.text}
+
+    return jsonify({
+        "ok": res.ok,
+        "status": res.status_code,
+        "response": response_json
+    }), (200 if res.ok else 500)
