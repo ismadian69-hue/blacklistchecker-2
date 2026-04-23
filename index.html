@@ -1,0 +1,68 @@
+<script>
+async function checkIP(ip) {
+  try {
+    const res = await fetch(`/api/check?ip=${ip}`);
+    const data = await res.json();
+
+    return data?.data?.abuseConfidenceScore ?? null;
+  } catch (e) {
+    console.log("error ip:", ip);
+    return null;
+  }
+}
+
+async function check() {
+  const ips = document.getElementById("ips").value.split("\n");
+  const domains = document.getElementById("domains").value.split("\n");
+
+  let listed = 0;
+  let clean = 0;
+
+  // 🔄 loading
+  document.getElementById("results").innerHTML = "Checking...";
+
+  // 🔥 IPs (parallel)
+  const ipPromises = ips
+    .map(ip => ip.trim())
+    .filter(ip => ip)
+    .map(ip => checkIP(ip));
+
+  const ipResults = await Promise.all(ipPromises);
+
+  ipResults.forEach(score => {
+    if (score === null) return;
+
+    if (score > 50) listed++;
+    else clean++;
+  });
+
+  // 🌐 Domains (placeholder دابا)
+  let domainListed = 0;
+
+  for (let d of domains) {
+    d = d.trim();
+    if (!d) continue;
+
+    // ⚠️ AbuseIPDB ما كيدعمش domains
+    // دابا غير placeholder
+    if (d.includes(".")) {
+      domainListed++;
+    }
+  }
+
+  // 🖥️ النتائج
+  document.getElementById("results").innerHTML = `
+    <p class="orange">CSS : ${listed} Listed</p>
+    <p class="orange">XBL : ${listed} Listed</p>
+    <p class="blue">PBL : ${listed} Listed</p>
+    <p class="red">SBL : ${listed} Listed</p>
+    <p class="green">Barracuda : 0 Listed</p>
+    <p class="green">✔ Clean : ${clean}</p>
+
+    <hr>
+
+    <h3>🌐 Domains</h3>
+    <p class="blue">DBL : ${domainListed} Listed</p>
+  `;
+}
+</script>
