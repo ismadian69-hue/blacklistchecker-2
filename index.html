@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blacklist Checker</title>
+<title>Blacklist Checker PRO</title>
 
 <style>
 body {
@@ -64,6 +64,19 @@ button {
   font-size: 14px;
   line-height: 1.6;
 }
+
+.clickable {
+  cursor: pointer;
+  color: #38bdf8;
+}
+
+.details {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #94a3b8;
+  max-height: 120px;
+  overflow-y: auto;
+}
 </style>
 
 </head>
@@ -71,7 +84,7 @@ button {
 <body>
 
 <div class="container">
-<h1>Blacklist Checker</h1>
+<h1>Blacklist Checker PRO</h1>
 
 <div class="grid">
 
@@ -83,6 +96,7 @@ button {
 <textarea id="domains_C" placeholder="Domains"></textarea>
 <button onclick="checkGroup('C')">Check C</button>
 <div class="result" id="result_C"></div>
+<div class="details" id="result_C_details"></div>
 </div>
 
 <!-- GROUP B -->
@@ -93,6 +107,7 @@ button {
 <textarea id="domains_B" placeholder="Domains"></textarea>
 <button onclick="checkGroup('B')">Check B</button>
 <div class="result" id="result_B"></div>
+<div class="details" id="result_B_details"></div>
 </div>
 
 <!-- GROUP ALL -->
@@ -101,6 +116,7 @@ button {
 <h2>Group ALL</h2>
 <button onclick="checkAll()">Check ALL</button>
 <div class="result" id="result_ALL"></div>
+<div class="details" id="result_ALL_details"></div>
 </div>
 
 </div>
@@ -116,36 +132,59 @@ function parseLines(text) {
 }
 
 function process(ips, domains) {
-  let css=0,xbl=0,pbl=0,sbl=0,barracuda=0,clean=0,dbl=0;
+
+  let css=[], xbl=[], pbl=[], sbl=[], barracuda=[], clean=[], dbl=[];
 
   ips.forEach(ip => {
     let score = Math.floor(Math.random()*100);
 
-    if (score > 85) sbl++;
-    else if (score > 70) xbl++;
-    else if (score > 55) css++;
-    else if (score > 40) pbl++;
-    else if (score > 25) barracuda++;
-    else clean++;
+    if (score > 85) sbl.push(ip);
+    else if (score > 70) xbl.push(ip);
+    else if (score > 55) css.push(ip);
+    else if (score > 40) pbl.push(ip);
+    else if (score > 25) barracuda.push(ip);
+    else clean.push(ip);
   });
 
-  domains.forEach(() => {
-    if (Math.random() > 0.5) dbl++;
+  domains.forEach(d => {
+    if (Math.random() > 0.5) dbl.push(d);
   });
 
   return {css,xbl,pbl,sbl,barracuda,clean,dbl};
 }
 
 function render(res, target) {
+
   document.getElementById(target).innerHTML = `
-🟤 CSS : ${res.css}<br>
-🟠 XBL : ${res.xbl}<br>
-🔵 PBL : ${res.pbl}<br>
-🔴 SBL : ${res.sbl}<br>
-🟢 Barracuda : ${res.barracuda}<br><br>
-✅ Clean : ${res.clean}<br>
-🌐 DBL : ${res.dbl}
+🟤 <span class="clickable" onclick="showList('${target}','css')">CSS : ${res.css.length}</span><br>
+🟠 <span class="clickable" onclick="showList('${target}','xbl')">XBL : ${res.xbl.length}</span><br>
+🔵 <span class="clickable" onclick="showList('${target}','pbl')">PBL : ${res.pbl.length}</span><br>
+🔴 <span class="clickable" onclick="showList('${target}','sbl')">SBL : ${res.sbl.length}</span><br>
+🟢 <span class="clickable" onclick="showList('${target}','barracuda')">Barracuda : ${res.barracuda.length}</span><br><br>
+
+✅ Clean : ${res.clean.length}<br>
+🌐 DBL : ${res.dbl.length}
   `;
+
+  window[target + "_data"] = res;
+}
+
+function showList(target, type) {
+
+  const data = window[target + "_data"];
+  const list = data[type];
+
+  let html = "<b>Details:</b><br>";
+
+  if (list.length === 0) {
+    html += "No results";
+  } else {
+    list.forEach(item => {
+      html += item + "<br>";
+    });
+  }
+
+  document.getElementById(target + "_details").innerHTML = html;
 }
 
 function checkGroup(group) {
