@@ -1,165 +1,178 @@
 import os
+import re
+import time
 import ipaddress
-import dns.resolver
-import dns.exception
 import requests
-from flask import Flask, jsonify
-
-app = Flask(__name__)
+import dns.resolver
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-ZEN_ZONE = "zen.spamhaus.org"
-DBL_ZONE = "dbl.spamhaus.org"
-
-# Spamhaus return codes used here:
-# CSS in ZEN => 127.0.0.3
-# ZEN includes SBL, CSS, XBL, PBL
-# We treat known ZEN response codes conservatively.
-ZEN_CODE_MAP = {
-    "127.0.0.2": "SBL",
-    "127.0.0.3": "CSS",
-    "127.0.0.4": "XBL",
-    "127.0.0.9": "SBL",
-    "127.0.0.10": "PBL",
-    "127.0.0.11": "PBL",
+# DNSBL zones
+IP_ZONES = {
+    "CSS": "css.spamhaus.org",
+    "SBL": "sbl.spamhaus.org",
+    "XBL": "xbl.spamhaus.org",
+    "PBL": "pbl.spamhaus.org",
+    "Barracuda": "b.barracudacentral.org",  # optional; verify provider terms for your use case
 }
 
-def read_list(file_path: str) -> list[str]:
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f if line.strip()]
-    except FileNotFoundError:
-        return []
+DOMAIN_ZONES = {
+    "DBL/SURBL": "multi.surbl.org",
+}
 
-def is_ipv4(value: str) -> bool:
+EMOJIS = {
+    "CSS": "🟤",
+    "XBL": "🟠",
+    "PBL": "🔵",
+    "SBL": "🔴",
+    "Barracuda": "🟢",
+    "DBL/SURBL": "🌍",
+    "Clean": "✅",
+}
+
+def is_ip(value: str) -> bool:
     try:
-        return isinstance(ipaddress.ip_address(value), ipaddress.IPv4Address)
+        ipaddress.ip_address(value)
+        return True
     except ValueError:
         return False
 
 def is_domain(value: str) -> bool:
-    if not value or len(value) > 253:
+    if len(value) > 253:
         return False
-    parts = value.strip(".").split(".")
-    if len(parts) < 2:
-        return False
-    for part in parts:
-        if not part or len(part) > 63:
-            return False
-        if part.startswith("-") or part.endswith("-"):
-            return False
-    return True
+    pattern = r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$"
+    return bool(re.match(pattern, value))
 
 def reverse_ipv4(ip: str) -> str:
     return ".".join(reversed(ip.split(".")))
 
-def dns_a_lookup(name: str) -> list[str]:
+def dns_a_exists(name: str) -> bool:
     try:
-        answers = dns.resolver.resolve(name, "A")
-        return [r.to_text() for r in answers]
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.exception.Timeout):
-        return []
-
-def check_ip_spamhaus(ip: str) -> dict:
-    result = {"SBL": False, "CSS": False, "XBL": False, "PBL": False}
-
-    if not is_ipv4(ip):
-        return result
-
-    query = f"{reverse_ipv4(ip)}.{ZEN_ZONE}"
-    codes = dns_a_lookup(query)
-
-    for code in codes:
-        list_name = ZEN_CODE_MAP.get(code)
-        if list_name:
-            result[list_name] = True
-
-    return result
-
-def check_domain_dbl(domain: str) -> bool:
-    if not is_domain(domain):
+        dns.resolver.resolve(name, "A")
+        return True
+    except Exception:
         return False
 
-    query = f"{domain.strip('.').lower()}.{DBL_ZONE}"
-    codes = dns_a_lookup(query)
+def check_ip_lists(ip: str) -> dict:
+    # For simplicity this starter supports IPv4 checks.
+    if ":" in ip:
+        return {k: False for k in IP_ZONES}
 
-    # Any valid A answer on DBL domain query means listed for our usage here.
-    # Never use DBL for IP lookups.
-    return len(codes) > 0
+    rev = reverse_ipv4(ip)
+    out = {}
+    for list_name, zone in IP_ZONES.items():
+        query = f"{rev}.{zone}"
+        out[list_name] = dns_a_exists(query)
+    return out
 
-def build_result() -> str:
-    ips = read_list("ips.txt")
-    domains = read_list("domains.txt")
+def check_domain_lists(domain: str) -> dict:
+    out = {}
+    domain = domain.lower().strip(".")
+    for list_name, zone in DOMAIN_ZONES.items():
+        query = f"{domain}.{zone}"
+        out[list_name] = dns_a_exists(query)
+    return out
 
-    counts = {
-        "CSS": 0,
-        "XBL": 0,
-        "PBL": 0,
-        "SBL": 0,
-        "Clean": 0,
-    }
+def summarize(items: list[str]) -> str:
+    ip_items = [x for x in items if is_ip(x)]
+    domain_items = [x for x in items if is_domain(x)]
 
-    dbl_count = 0
+    counts = {name: 0 for name in IP_ZONES}
+    counts["Clean"] = 0
+    domain_counts = {name: 0 for name in DOMAIN_ZONES}
 
-    for ip in ips:
-        if not is_ipv4(ip):
-            continue
+    detailed = []
 
-        res = check_ip_spamhaus(ip)
-        listed = False
-
-        for key in ["CSS", "XBL", "PBL", "SBL"]:
-            if res[key]:
-                counts[key] += 1
-                listed = True
-
-        if not listed:
+    for ip in ip_items:
+        res = check_ip_lists(ip)
+        listed_any = False
+        listed_on = []
+        for name, listed in res.items():
+            if listed:
+                counts[name] += 1
+                listed_any = True
+                listed_on.append(name)
+        if not listed_any:
             counts["Clean"] += 1
+        detailed.append(f"IP {ip} -> {', '.join(listed_on) if listed_on else 'Clean'}")
 
-    for domain in domains:
-        if check_domain_dbl(domain):
-            dbl_count += 1
+    for dom in domain_items:
+        res = check_domain_lists(dom)
+        listed_on = []
+        for name, listed in res.items():
+            if listed:
+                domain_counts[name] += 1
+                listed_on.append(name)
+        detailed.append(f"DOMAIN {dom} -> {', '.join(listed_on) if listed_on else 'Clean'}")
 
-    return f"""🟤 CSS        : {counts['CSS']} Listed
-🟠 XBL        : {counts['XBL']} Listed
-🔵 PBL        : {counts['PBL']} Listed
-🔴 SBL        : {counts['SBL']} Listed
-✅ Clean      : {counts['Clean']}
+    lines = [
+        f"{EMOJIS['CSS']} CSS        : {counts['CSS']} Listed",
+        f"{EMOJIS['XBL']} XBL        : {counts['XBL']} Listed",
+        f"{EMOJIS['PBL']} PBL        : {counts['PBL']} Listed",
+        f"{EMOJIS['SBL']} SBL        : {counts['SBL']} Listed",
+        f"{EMOJIS['Barracuda']} Barracuda  : {counts['Barracuda']} Listed",
+        f"{EMOJIS['Clean']} Clean      : {counts['Clean']}",
+        "",
+        "━━━━━━━━━━━━━━",
+        "🌐 DOMAINS",
+        "━━━━━━━━━━━━━━",
+        f"{EMOJIS['DBL/SURBL']} DBL/SURBL  : {domain_counts['DBL/SURBL']} Listed",
+        "",
+        "━━━━━━━━━━━━━━",
+        "DETAILS",
+        "━━━━━━━━━━━━━━",
+        *detailed[:50],  # avoid too long messages
+    ]
+    return "\n".join(lines)
 
-━━━━━━━━━━━━━━
-🌐 DOMAINS
-━━━━━━━━━━━━━━
-🌍 DBL        : {dbl_count} Listed"""
+def send_message(chat_id: int, text: str):
+    requests.post(f"{API}/sendMessage", json={
+        "chat_id": chat_id,
+        "text": text
+    }, timeout=30)
 
-@app.route("/api/cron", methods=["GET"])
-def run_cron():
-    if not BOT_TOKEN or not CHAT_ID:
-        return jsonify({
-            "ok": False,
-            "error": "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID"
-        }), 500
+def parse_items(text: str) -> list[str]:
+    parts = re.split(r"[\s,;|]+", text.strip())
+    return [p for p in parts if p and p.lower() != "/check"]
 
-    text = build_result()
+def handle_update(update: dict):
+    message = update.get("message", {})
+    chat = message.get("chat", {})
+    text = message.get("text", "") or ""
+    chat_id = chat.get("id")
+    if not chat_id:
+        return
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    res = requests.post(
-        url,
-        json={
-            "chat_id": CHAT_ID,
-            "text": text
-        },
-        timeout=30
-    )
+    if text.startswith("/start"):
+        send_message(chat_id, "Sift /check m3a IPs w domains.\nExample:\n/check 1.2.3.4 8.8.8.8 example.com")
+        return
 
-    try:
-        response_json = res.json()
-    except Exception:
-        response_json = {"raw": res.text}
+    if text.startswith("/check"):
+        items = parse_items(text)
+        if not items:
+            send_message(chat_id, "Sift IPs w domains ba3d /check")
+            return
+        result = summarize(items)
+        send_message(chat_id, result)
+        return
 
-    return jsonify({
-        "ok": res.ok,
-        "status": res.status_code,
-        "response": response_json
-    }), (200 if res.ok else 500)
+    send_message(chat_id, "Commands:\n/start\n/check <ip/domain> <ip/domain> ...")
+
+def main():
+    offset = None
+    while True:
+        resp = requests.get(f"{API}/getUpdates", params={
+            "timeout": 30,
+            "offset": offset
+        }, timeout=40)
+        data = resp.json()
+        for update in data.get("result", []):
+            offset = update["update_id"] + 1
+            handle_update(update)
+        time.sleep(1)
+
+if __name__ == "__main__":
+    if not BOT_TOKEN:
+        raise RuntimeError("Set TELEGRAM_BOT_TOKEN first")
+    main()
