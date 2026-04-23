@@ -3,20 +3,21 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Checker FIX</title>
+<title>Checker PRO Step 2</title>
 
 <style>
-body{background:black;color:white;font-family:Arial;text-align:center}
-textarea{width:80%;height:120px;margin:10px}
-button{padding:10px;margin:5px}
-#result{margin-top:20px}
+body{background:#0f172a;color:white;font-family:Arial;text-align:center}
+textarea{width:80%;height:120px;margin:10px;background:#020617;color:white}
+button{padding:10px;margin:5px;background:#38bdf8;border:none}
+table{margin:auto;margin-top:20px;border-collapse:collapse;width:80%}
+td,th{border:1px solid #334155;padding:8px}
 </style>
 
 </head>
 
 <body>
 
-<h1>Checker</h1>
+<h1>Checker PRO</h1>
 
 <textarea id="ips">8.8.8.8
 1.1.1.1</textarea><br>
@@ -30,12 +31,11 @@ button{padding:10px;margin:5px}
 let DATA = [];
 
 function run(){
-  let txt = document.getElementById("ips").value;
-  let ips = txt.split("\n");
+  let ips = document.getElementById("ips").value.split("\n");
 
   DATA = [];
 
-  let html = "";
+  let html = "<table><tr><th>IP</th><th>Status</th></tr>";
 
   ips.forEach(ip=>{
     ip = ip.trim();
@@ -49,15 +49,17 @@ function run(){
     else if(r>0.4) type="CSS";
 
     DATA.push(ip+" - "+type);
-    html += ip+" → "+type+"<br>";
+
+    html += "<tr><td>"+ip+"</td><td>"+type+"</td></tr>";
   });
+
+  html += "</table>";
 
   document.getElementById("result").innerHTML = html;
 }
 
 function copy(){
   if(DATA.length==0){ alert("no data"); return; }
-
   navigator.clipboard.writeText(DATA.join("\n"));
   alert("copied");
 }
