@@ -3,82 +3,81 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blacklist Checker PRO</title>
+<title>Blacklist Checker PRO FIXED</title>
 
 <style>
 body {
-  background: #0f172a;
-  color: white;
-  font-family: Arial;
-  padding: 20px;
+  background:#0f172a;
+  color:white;
+  font-family:Arial;
+  padding:20px;
 }
 
 .container {
-  max-width: 1200px;
-  margin: auto;
+  max-width:1200px;
+  margin:auto;
 }
 
 h1 {
-  text-align: center;
-  color: #38bdf8;
+  text-align:center;
+  color:#38bdf8;
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
 }
 
 .card {
-  background: #1f2937;
-  padding: 15px;
-  border-radius: 12px;
+  background:#1f2937;
+  padding:15px;
+  border-radius:12px;
 }
 
 textarea {
-  width: 100%;
-  height: 100px;
-  margin-top: 10px;
-  background: #020617;
-  color: white;
-  border: none;
-  padding: 10px;
+  width:100%;
+  height:100px;
+  margin-top:10px;
+  background:#020617;
+  color:white;
+  border:none;
+  padding:10px;
 }
 
 button {
-  margin-top: 10px;
-  padding: 10px;
-  width: 100%;
-  background: #38bdf8;
-  border: none;
-  cursor: pointer;
+  margin-top:10px;
+  padding:10px;
+  width:100%;
+  background:#38bdf8;
+  border:none;
+  cursor:pointer;
 }
 
 .result {
-  margin-top: 10px;
-  background: #020617;
-  padding: 10px;
-  border-radius: 10px;
-  font-size: 13px;
+  margin-top:10px;
+  background:#020617;
+  padding:10px;
+  border-radius:10px;
+  font-size:13px;
 }
 
 table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
 }
 
-th, td {
-  border: 1px solid #334155;
-  padding: 6px;
-  text-align: center;
+th,td {
+  border:1px solid #334155;
+  padding:6px;
+  text-align:center;
 }
 
 select {
-  margin-top: 10px;
-  width: 100%;
-  padding: 5px;
+  margin-top:10px;
+  width:100%;
+  padding:5px;
 }
 </style>
 
@@ -96,9 +95,8 @@ select {
 <div class="card">
 <h2>Group C</h2>
 <textarea id="ips_C" placeholder="IPs"></textarea>
-<textarea id="domains_C" placeholder="Domains"></textarea>
 <button onclick="run('C')">Check C</button>
-<div class="result" id="result_C"></div>
+<div id="result_C" class="result">Ready...</div>
 </div>
 
 <!-- GROUP B -->
@@ -106,9 +104,8 @@ select {
 <div class="card">
 <h2>Group B</h2>
 <textarea id="ips_B" placeholder="IPs"></textarea>
-<textarea id="domains_B" placeholder="Domains"></textarea>
 <button onclick="run('B')">Check B</button>
-<div class="result" id="result_B"></div>
+<div id="result_B" class="result">Ready...</div>
 </div>
 
 <!-- GROUP ALL -->
@@ -116,7 +113,7 @@ select {
 <div class="card">
 <h2>Group ALL</h2>
 <button onclick="runAll()">Check ALL</button>
-<div class="result" id="result_ALL"></div>
+<div id="result_ALL" class="result">Ready...</div>
 </div>
 
 </div>
@@ -124,14 +121,16 @@ select {
 
 <script>
 
-function parse(text) {
-  return text.split(/\\n|,|;|\\s+/).map(x=>x.trim()).filter(x=>x);
+// parse input
+function parse(text){
+  return text.split(/\n|,|;|\s+/).map(x=>x.trim()).filter(x=>x);
 }
 
-function generate(ips) {
+// generate fake results
+function generate(ips){
   let arr = [];
 
-  ips.forEach(ip => {
+  ips.forEach(ip=>{
     let score = Math.random()*100;
     let type = "Clean";
 
@@ -147,15 +146,16 @@ function generate(ips) {
   return arr;
 }
 
-function render(data, target) {
+// render table
+function render(data,target){
 
   window[target+"_data"]=data;
 
   let html = `
-  <button onclick="copyData('${target}')">📋 Copy</button>
-  <button onclick="exportData('${target}')">📁 Export</button>
+  <button onclick="copyData('${target}')">Copy</button>
+  <button onclick="exportData('${target}')">Export</button>
 
-  <select onchange="filter('${target}', this.value)">
+  <select onchange="filterData('${target}',this.value)">
     <option value="all">All</option>
     <option>Clean</option>
     <option>SBL</option>
@@ -170,48 +170,53 @@ function render(data, target) {
   `;
 
   data.forEach(d=>{
-    html+=`<tr><td>${d.ip}</td><td>${d.type}</td></tr>`;
+    html += `<tr><td>${d.ip}</td><td>${d.type}</td></tr>`;
   });
 
-  html+="</table>";
+  html += "</table>";
 
-  document.getElementById(target).innerHTML=html;
+  document.getElementById(target).innerHTML = html;
 }
 
-function filter(target, type) {
+// filter
+function filterData(target,type){
   let data = window[target+"_data"];
 
   if(type!="all"){
     data = data.filter(d=>d.type==type);
   }
 
-  render(data, target);
+  render(data,target);
 }
 
+// copy
 function copyData(target){
   let data = window[target+"_data"];
-  let txt = data.map(d=>d.ip+" - "+d.type).join("\\n");
+  let txt = data.map(d=>d.ip+" - "+d.type).join("\n");
   navigator.clipboard.writeText(txt);
   alert("Copied");
 }
 
+// export
 function exportData(target){
   let data = window[target+"_data"];
-  let txt = data.map(d=>d.ip+" - "+d.type).join("\\n");
+  let txt = data.map(d=>d.ip+" - "+d.type).join("\n");
 
-  let blob = new Blob([txt], {type:"text/plain"});
+  let blob = new Blob([txt],{type:"text/plain"});
   let a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "results.txt";
   a.click();
 }
 
+// run group
 function run(group){
   let ips = parse(document.getElementById("ips_"+group).value);
   let data = generate(ips);
-  render(data, "result_"+group);
+  render(data,"result_"+group);
 }
 
+// run all
 function runAll(){
   let ips = [
     ...parse(document.getElementById("ips_C").value),
@@ -219,7 +224,7 @@ function runAll(){
   ];
 
   let data = generate(ips);
-  render(data, "result_ALL");
+  render(data,"result_ALL");
 }
 
 </script>
