@@ -15,7 +15,7 @@ body {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: auto;
 }
 
@@ -28,7 +28,6 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
-  margin-top: 20px;
 }
 
 .card {
@@ -39,7 +38,7 @@ h1 {
 
 textarea {
   width: 100%;
-  height: 120px;
+  height: 100px;
   margin-top: 10px;
   background: #020617;
   color: white;
@@ -61,21 +60,25 @@ button {
   background: #020617;
   padding: 10px;
   border-radius: 10px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.clickable {
-  cursor: pointer;
-  color: #38bdf8;
-}
-
-.details {
-  margin-top: 10px;
   font-size: 13px;
-  color: #94a3b8;
-  max-height: 120px;
-  overflow-y: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  border: 1px solid #334155;
+  padding: 6px;
+  text-align: center;
+}
+
+select {
+  margin-top: 10px;
+  width: 100%;
+  padding: 5px;
 }
 </style>
 
@@ -94,9 +97,8 @@ button {
 <h2>Group C</h2>
 <textarea id="ips_C" placeholder="IPs"></textarea>
 <textarea id="domains_C" placeholder="Domains"></textarea>
-<button onclick="checkGroup('C')">Check C</button>
+<button onclick="run('C')">Check C</button>
 <div class="result" id="result_C"></div>
-<div class="details" id="result_C_details"></div>
 </div>
 
 <!-- GROUP B -->
@@ -105,18 +107,16 @@ button {
 <h2>Group B</h2>
 <textarea id="ips_B" placeholder="IPs"></textarea>
 <textarea id="domains_B" placeholder="Domains"></textarea>
-<button onclick="checkGroup('B')">Check B</button>
+<button onclick="run('B')">Check B</button>
 <div class="result" id="result_B"></div>
-<div class="details" id="result_B_details"></div>
 </div>
 
 <!-- GROUP ALL -->
 
 <div class="card">
 <h2>Group ALL</h2>
-<button onclick="checkAll()">Check ALL</button>
+<button onclick="runAll()">Check ALL</button>
 <div class="result" id="result_ALL"></div>
-<div class="details" id="result_ALL_details"></div>
 </div>
 
 </div>
@@ -124,90 +124,102 @@ button {
 
 <script>
 
-function parseLines(text) {
-  return text
-    .split(/\\n|,|;|\\s+/)
-    .map(x => x.trim())
-    .filter(x => x.length > 0);
+function parse(text) {
+  return text.split(/\\n|,|;|\\s+/).map(x=>x.trim()).filter(x=>x);
 }
 
-function process(ips, domains) {
-
-  let css=[], xbl=[], pbl=[], sbl=[], barracuda=[], clean=[], dbl=[];
+function generate(ips) {
+  let arr = [];
 
   ips.forEach(ip => {
-    let score = Math.floor(Math.random()*100);
+    let score = Math.random()*100;
+    let type = "Clean";
 
-    if (score > 85) sbl.push(ip);
-    else if (score > 70) xbl.push(ip);
-    else if (score > 55) css.push(ip);
-    else if (score > 40) pbl.push(ip);
-    else if (score > 25) barracuda.push(ip);
-    else clean.push(ip);
+    if(score>85) type="SBL";
+    else if(score>70) type="XBL";
+    else if(score>55) type="CSS";
+    else if(score>40) type="PBL";
+    else if(score>25) type="Barracuda";
+
+    arr.push({ip,type});
   });
 
-  domains.forEach(d => {
-    if (Math.random() > 0.5) dbl.push(d);
-  });
-
-  return {css,xbl,pbl,sbl,barracuda,clean,dbl};
+  return arr;
 }
 
-function render(res, target) {
+function render(data, target) {
 
-  document.getElementById(target).innerHTML = `
-🟤 <span class="clickable" onclick="showList('${target}','css')">CSS : ${res.css.length}</span><br>
-🟠 <span class="clickable" onclick="showList('${target}','xbl')">XBL : ${res.xbl.length}</span><br>
-🔵 <span class="clickable" onclick="showList('${target}','pbl')">PBL : ${res.pbl.length}</span><br>
-🔴 <span class="clickable" onclick="showList('${target}','sbl')">SBL : ${res.sbl.length}</span><br>
-🟢 <span class="clickable" onclick="showList('${target}','barracuda')">Barracuda : ${res.barracuda.length}</span><br><br>
+  window[target+"_data"]=data;
 
-✅ Clean : ${res.clean.length}<br>
-🌐 DBL : ${res.dbl.length}
+  let html = `
+  <button onclick="copyData('${target}')">📋 Copy</button>
+  <button onclick="exportData('${target}')">📁 Export</button>
+
+  <select onchange="filter('${target}', this.value)">
+    <option value="all">All</option>
+    <option>Clean</option>
+    <option>SBL</option>
+    <option>XBL</option>
+    <option>CSS</option>
+    <option>PBL</option>
+    <option>Barracuda</option>
+  </select>
+
+  <table>
+  <tr><th>IP</th><th>Status</th></tr>
   `;
 
-  window[target + "_data"] = res;
+  data.forEach(d=>{
+    html+=`<tr><td>${d.ip}</td><td>${d.type}</td></tr>`;
+  });
+
+  html+="</table>";
+
+  document.getElementById(target).innerHTML=html;
 }
 
-function showList(target, type) {
+function filter(target, type) {
+  let data = window[target+"_data"];
 
-  const data = window[target + "_data"];
-  const list = data[type];
-
-  let html = "<b>Details:</b><br>";
-
-  if (list.length === 0) {
-    html += "No results";
-  } else {
-    list.forEach(item => {
-      html += item + "<br>";
-    });
+  if(type!="all"){
+    data = data.filter(d=>d.type==type);
   }
 
-  document.getElementById(target + "_details").innerHTML = html;
+  render(data, target);
 }
 
-function checkGroup(group) {
-  const ips = parseLines(document.getElementById("ips_" + group).value);
-  const domains = parseLines(document.getElementById("domains_" + group).value);
-
-  const res = process(ips, domains);
-  render(res, "result_" + group);
+function copyData(target){
+  let data = window[target+"_data"];
+  let txt = data.map(d=>d.ip+" - "+d.type).join("\\n");
+  navigator.clipboard.writeText(txt);
+  alert("Copied");
 }
 
-function checkAll() {
-  const ips = [
-    ...parseLines(document.getElementById("ips_C").value),
-    ...parseLines(document.getElementById("ips_B").value)
+function exportData(target){
+  let data = window[target+"_data"];
+  let txt = data.map(d=>d.ip+" - "+d.type).join("\\n");
+
+  let blob = new Blob([txt], {type:"text/plain"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "results.txt";
+  a.click();
+}
+
+function run(group){
+  let ips = parse(document.getElementById("ips_"+group).value);
+  let data = generate(ips);
+  render(data, "result_"+group);
+}
+
+function runAll(){
+  let ips = [
+    ...parse(document.getElementById("ips_C").value),
+    ...parse(document.getElementById("ips_B").value)
   ];
 
-  const domains = [
-    ...parseLines(document.getElementById("domains_C").value),
-    ...parseLines(document.getElementById("domains_B").value)
-  ];
-
-  const res = process(ips, domains);
-  render(res, "result_ALL");
+  let data = generate(ips);
+  render(data, "result_ALL");
 }
 
 </script>
