@@ -1,230 +1,76 @@
 <!DOCTYPE html>
 
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Blacklist Checker PRO FIXED</title>
+<title>Checker FIX</title>
 
 <style>
-body {
-  background:#0f172a;
-  color:white;
-  font-family:Arial;
-  padding:20px;
-}
-
-.container {
-  max-width:1200px;
-  margin:auto;
-}
-
-h1 {
-  text-align:center;
-  color:#38bdf8;
-}
-
-.grid {
-  display:grid;
-  grid-template-columns:1fr 1fr 1fr;
-  gap:20px;
-}
-
-.card {
-  background:#1f2937;
-  padding:15px;
-  border-radius:12px;
-}
-
-textarea {
-  width:100%;
-  height:100px;
-  margin-top:10px;
-  background:#020617;
-  color:white;
-  border:none;
-  padding:10px;
-}
-
-button {
-  margin-top:10px;
-  padding:10px;
-  width:100%;
-  background:#38bdf8;
-  border:none;
-  cursor:pointer;
-}
-
-.result {
-  margin-top:10px;
-  background:#020617;
-  padding:10px;
-  border-radius:10px;
-  font-size:13px;
-}
-
-table {
-  width:100%;
-  border-collapse:collapse;
-  margin-top:10px;
-}
-
-th,td {
-  border:1px solid #334155;
-  padding:6px;
-  text-align:center;
-}
-
-select {
-  margin-top:10px;
-  width:100%;
-  padding:5px;
-}
+body{background:black;color:white;font-family:Arial;text-align:center}
+textarea{width:80%;height:120px;margin:10px}
+button{padding:10px;margin:5px}
+#result{margin-top:20px}
 </style>
 
 </head>
 
 <body>
 
-<div class="container">
-<h1>Blacklist Checker PRO</h1>
+<h1>Checker</h1>
 
-<div class="grid">
+<textarea id="ips">8.8.8.8
+1.1.1.1</textarea><br>
 
-<!-- GROUP C -->
+<button onclick="run()">Check</button> <button onclick="copy()">Copy</button> <button onclick="download()">Export</button>
 
-<div class="card">
-<h2>Group C</h2>
-<textarea id="ips_C" placeholder="IPs"></textarea>
-<button onclick="run('C')">Check C</button>
-<div id="result_C" class="result">Ready...</div>
-</div>
-
-<!-- GROUP B -->
-
-<div class="card">
-<h2>Group B</h2>
-<textarea id="ips_B" placeholder="IPs"></textarea>
-<button onclick="run('B')">Check B</button>
-<div id="result_B" class="result">Ready...</div>
-</div>
-
-<!-- GROUP ALL -->
-
-<div class="card">
-<h2>Group ALL</h2>
-<button onclick="runAll()">Check ALL</button>
-<div id="result_ALL" class="result">Ready...</div>
-</div>
-
-</div>
-</div>
+<div id="result"></div>
 
 <script>
 
-// parse input
-function parse(text){
-  return text.split(/\n|,|;|\s+/).map(x=>x.trim()).filter(x=>x);
-}
+let DATA = [];
 
-// generate fake results
-function generate(ips){
-  let arr = [];
+function run(){
+  let txt = document.getElementById("ips").value;
+  let ips = txt.split("\n");
+
+  DATA = [];
+
+  let html = "";
 
   ips.forEach(ip=>{
-    let score = Math.random()*100;
+    ip = ip.trim();
+    if(!ip) return;
+
+    let r = Math.random();
     let type = "Clean";
 
-    if(score>85) type="SBL";
-    else if(score>70) type="XBL";
-    else if(score>55) type="CSS";
-    else if(score>40) type="PBL";
-    else if(score>25) type="Barracuda";
+    if(r>0.8) type="SBL";
+    else if(r>0.6) type="XBL";
+    else if(r>0.4) type="CSS";
 
-    arr.push({ip,type});
+    DATA.push(ip+" - "+type);
+    html += ip+" → "+type+"<br>";
   });
 
-  return arr;
+  document.getElementById("result").innerHTML = html;
 }
 
-// render table
-function render(data,target){
+function copy(){
+  if(DATA.length==0){ alert("no data"); return; }
 
-  window[target+"_data"]=data;
-
-  let html = `
-  <button onclick="copyData('${target}')">Copy</button>
-  <button onclick="exportData('${target}')">Export</button>
-
-  <select onchange="filterData('${target}',this.value)">
-    <option value="all">All</option>
-    <option>Clean</option>
-    <option>SBL</option>
-    <option>XBL</option>
-    <option>CSS</option>
-    <option>PBL</option>
-    <option>Barracuda</option>
-  </select>
-
-  <table>
-  <tr><th>IP</th><th>Status</th></tr>
-  `;
-
-  data.forEach(d=>{
-    html += `<tr><td>${d.ip}</td><td>${d.type}</td></tr>`;
-  });
-
-  html += "</table>";
-
-  document.getElementById(target).innerHTML = html;
+  navigator.clipboard.writeText(DATA.join("\n"));
+  alert("copied");
 }
 
-// filter
-function filterData(target,type){
-  let data = window[target+"_data"];
+function download(){
+  if(DATA.length==0){ alert("no data"); return; }
 
-  if(type!="all"){
-    data = data.filter(d=>d.type==type);
-  }
-
-  render(data,target);
-}
-
-// copy
-function copyData(target){
-  let data = window[target+"_data"];
-  let txt = data.map(d=>d.ip+" - "+d.type).join("\n");
-  navigator.clipboard.writeText(txt);
-  alert("Copied");
-}
-
-// export
-function exportData(target){
-  let data = window[target+"_data"];
-  let txt = data.map(d=>d.ip+" - "+d.type).join("\n");
-
-  let blob = new Blob([txt],{type:"text/plain"});
+  let blob = new Blob([DATA.join("\n")],{type:"text/plain"});
   let a = document.createElement("a");
+
   a.href = URL.createObjectURL(blob);
-  a.download = "results.txt";
+  a.download = "result.txt";
   a.click();
-}
-
-// run group
-function run(group){
-  let ips = parse(document.getElementById("ips_"+group).value);
-  let data = generate(ips);
-  render(data,"result_"+group);
-}
-
-// run all
-function runAll(){
-  let ips = [
-    ...parse(document.getElementById("ips_C").value),
-    ...parse(document.getElementById("ips_B").value)
-  ];
-
-  let data = generate(ips);
-  render(data,"result_ALL");
 }
 
 </script>
