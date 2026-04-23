@@ -1,68 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Blacklist Checker</title>
+
+<style>
+body {
+  background: #0b1220;
+  font-family: Arial;
+  color: white;
+  text-align: center;
+}
+
+.container {
+  width: 80%;
+  margin: auto;
+}
+
+h1 {
+  color: #38bdf8;
+}
+
+.box {
+  display: inline-block;
+  width: 40%;
+  margin: 10px;
+  padding: 15px;
+  background: #1e293b;
+  border-radius: 10px;
+}
+
+textarea {
+  width: 90%;
+  height: 150px;
+  background: #020617;
+  color: white;
+  border: none;
+  padding: 10px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 10px 30px;
+  background: #38bdf8;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.results {
+  margin-top: 30px;
+  padding: 20px;
+  background: #020617;
+  border-radius: 10px;
+  text-align: left;
+}
+
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+.orange { color: orange; }
+.blue { color: #60a5fa; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>Blacklist Checker</h1>
+
+  <div class="box">
+    <h3>IP Addresses</h3>
+    <textarea id="ips"></textarea>
+  </div>
+
+  <div class="box">
+    <h3>Domains</h3>
+    <textarea id="domains"></textarea>
+  </div>
+
+  <br>
+  <button onclick="check()">Check</button>
+
+  <div class="results" id="results">
+    <p>Ready to scan...</p>
+  </div>
+</div>
+
 <script>
 async function checkIP(ip) {
   try {
     const res = await fetch(`/api/check?ip=${ip}`);
     const data = await res.json();
-
-    return data?.data?.abuseConfidenceScore ?? null;
+    return data?.data?.abuseConfidenceScore || 0;
   } catch (e) {
-    console.log("error ip:", ip);
-    return null;
+    return 0;
   }
 }
 
 async function check() {
   const ips = document.getElementById("ips").value.split("\n");
-  const domains = document.getElementById("domains").value.split("\n");
 
   let listed = 0;
   let clean = 0;
 
-  // 🔄 loading
-  document.getElementById("results").innerHTML = "Checking...";
+  for (let ip of ips) {
+    ip = ip.trim();
+    if (!ip) continue;
 
-  // 🔥 IPs (parallel)
-  const ipPromises = ips
-    .map(ip => ip.trim())
-    .filter(ip => ip)
-    .map(ip => checkIP(ip));
-
-  const ipResults = await Promise.all(ipPromises);
-
-  ipResults.forEach(score => {
-    if (score === null) return;
+    const score = await checkIP(ip);
 
     if (score > 50) listed++;
     else clean++;
-  });
-
-  // 🌐 Domains (placeholder دابا)
-  let domainListed = 0;
-
-  for (let d of domains) {
-    d = d.trim();
-    if (!d) continue;
-
-    // ⚠️ AbuseIPDB ما كيدعمش domains
-    // دابا غير placeholder
-    if (d.includes(".")) {
-      domainListed++;
-    }
   }
 
-  // 🖥️ النتائج
   document.getElementById("results").innerHTML = `
-    <p class="orange">CSS : ${listed} Listed</p>
-    <p class="orange">XBL : ${listed} Listed</p>
-    <p class="blue">PBL : ${listed} Listed</p>
-    <p class="red">SBL : ${listed} Listed</p>
-    <p class="green">Barracuda : 0 Listed</p>
-    <p class="green">✔ Clean : ${clean}</p>
-
-    <hr>
-
-    <h3>🌐 Domains</h3>
-    <p class="blue">DBL : ${domainListed} Listed</p>
+    <h3>Results</h3>
+    <p class="red">Listed: ${listed}</p>
+    <p class="green">Clean: ${clean}</p>
   `;
 }
 </script>
+
+</body>
+</html>
