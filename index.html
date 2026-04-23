@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Blacklist Checker</title>
+
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
+      font-family: "Segoe UI", Arial, sans-serif;
     }
 
     body {
@@ -51,7 +52,6 @@
     .card h2 {
       font-size: 18px;
       margin-bottom: 12px;
-      color: #f8fafc;
     }
 
     label {
@@ -78,6 +78,12 @@
     textarea:focus {
       border-color: #38bdf8;
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .muted {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 8px;
     }
 
     .actions {
@@ -110,13 +116,7 @@
       margin-top: 10px;
       white-space: pre-line;
       line-height: 1.9;
-      font-size: 17px;
-    }
-
-    .muted {
-      color: #94a3b8;
-      font-size: 13px;
-      margin-top: 8px;
+      font-size: 16px;
     }
 
     @media (max-width: 768px) {
@@ -126,23 +126,30 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Blacklist Checker</h1>
 
     <div class="grid">
+      <!-- IPs -->
       <div class="card">
-        <h2>IPs</h2>
-        <label for="ips">Hna 7et IPs, wa7ed f kol ster aw b spaces</label>
+        <h2>IP Addresses</h2>
+        <label for="ips">
+          Enter one or more IP addresses (one per line or separated by spaces)
+        </label>
         <textarea id="ips" placeholder="1.1.1.1
 8.8.8.8
 192.168.1.1"></textarea>
-        <div class="muted">Example: 1 IP per line</div>
+        <div class="muted">Example: one IP per line</div>
       </div>
 
+      <!-- Domains -->
       <div class="card">
         <h2>Domains</h2>
-        <label for="domains">Hna 7et domains, wa7ed f kol ster</label>
+        <label for="domains">
+          Enter one or more domain names (one per line)
+        </label>
         <textarea id="domains" placeholder="example.com
 test.net
 mydomain.org"></textarea>
@@ -181,8 +188,7 @@ mydomain.org"></textarea>
       const ips = parseLines(document.getElementById("ips").value);
       const domains = parseLines(document.getElementById("domains").value);
 
-      // Demo numbers only
-      // hado placeholders 7ta تربطهم b backend
+      // Demo logic (replace with real backend later)
       let css = 0;
       let xbl = 0;
       let pbl = 0;
