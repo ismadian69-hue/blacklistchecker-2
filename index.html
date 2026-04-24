@@ -3,66 +3,59 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blacklist Checker</title>
 
 <style>
 body {
-  background: #0f172a;
-  color: white;
-  font-family: Arial;
-  padding: 20px;
-}
-
-.container {
-  max-width: 1100px;
-  margin: auto;
+  background:#0f172a;
+  color:white;
+  font-family:Arial;
+  padding:20px;
 }
 
 h1 {
-  text-align: center;
-  color: #38bdf8;
+  text-align:center;
+  color:#38bdf8;
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
-  margin-top: 20px;
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:20px;
 }
 
 .card {
-  background: #1f2937;
-  padding: 15px;
-  border-radius: 12px;
+  background:#1e293b;
+  padding:15px;
+  border-radius:12px;
 }
 
 textarea {
-  width: 100%;
-  height: 120px;
-  margin-top: 10px;
-  background: #020617;
-  color: white;
-  border: none;
-  padding: 10px;
+  width:100%;
+  height:120px;
+  background:#020617;
+  color:white;
+  border:none;
+  padding:10px;
+  margin-top:10px;
 }
 
 button {
-  margin-top: 10px;
-  padding: 10px;
-  width: 100%;
-  background: #38bdf8;
-  border: none;
-  cursor: pointer;
+  margin-top:10px;
+  padding:10px;
+  width:100%;
+  background:#38bdf8;
+  border:none;
+  cursor:pointer;
 }
 
 .result {
-  margin-top: 10px;
-  background: #020617;
-  padding: 10px;
-  border-radius: 10px;
-  font-size: 14px;
-  line-height: 1.6;
+  margin-top:10px;
+  background:#020617;
+  padding:15px;
+  border-radius:10px;
+  font-size:14px;
+  line-height:1.8;
 }
 </style>
 
@@ -70,104 +63,110 @@ button {
 
 <body>
 
-<div class="container">
 <h1>Blacklist Checker</h1>
 
 <div class="grid">
 
-<!-- GROUP C -->
+<div class="card">
+<h3>Group C</h3>
+<textarea id="ips_C"></textarea>
+<textarea id="domains_C"></textarea>
+<button onclick="run('C')">Check C</button>
+<div id="result_C" class="result"></div>
+</div>
 
 <div class="card">
-<h2>Group C</h2>
-<textarea id="ips_C" placeholder="IPs"></textarea>
-<textarea id="domains_C" placeholder="Domains"></textarea>
-<button onclick="checkGroup('C')">Check C</button>
-<div class="result" id="result_C"></div>
+<h3>Group B</h3>
+<textarea id="ips_B"></textarea>
+<textarea id="domains_B"></textarea>
+<button onclick="run('B')">Check B</button>
+<div id="result_B" class="result"></div>
 </div>
-
-<!-- GROUP B -->
 
 <div class="card">
-<h2>Group B</h2>
-<textarea id="ips_B" placeholder="IPs"></textarea>
-<textarea id="domains_B" placeholder="Domains"></textarea>
-<button onclick="checkGroup('B')">Check B</button>
-<div class="result" id="result_B"></div>
+<h3>Group ALL</h3>
+<button onclick="runAll()">Check ALL</button>
+<div id="result_ALL" class="result"></div>
 </div>
 
-<!-- GROUP ALL -->
-
-<div class="card">
-<h2>Group ALL</h2>
-<button onclick="checkAll()">Check ALL</button>
-<div class="result" id="result_ALL"></div>
-</div>
-
-</div>
 </div>
 
 <script>
 
-function parseLines(text) {
-  return text
-    .split(/\\n|,|;|\\s+/)
-    .map(x => x.trim())
-    .filter(x => x.length > 0);
+function parse(text){
+  return text.split(/\n|,|;|\s+/).map(x=>x.trim()).filter(x=>x);
 }
 
-function process(ips, domains) {
-  let css=0,xbl=0,pbl=0,sbl=0,barracuda=0,clean=0,dbl=0;
+// 🔥 يعطي نفس النتيجة لكل IP (ماشي random كل مرة)
+function getType(ip){
+  let sum = 0;
+  for(let i=0;i<ip.length;i++){
+    sum += ip.charCodeAt(i);
+  }
 
-  ips.forEach(ip => {
-    let score = Math.floor(Math.random()*100);
+  let r = sum % 100;
 
-    if (score > 85) sbl++;
-    else if (score > 70) xbl++;
-    else if (score > 55) css++;
-    else if (score > 40) pbl++;
-    else if (score > 25) barracuda++;
-    else clean++;
-  });
-
-  domains.forEach(() => {
-    if (Math.random() > 0.5) dbl++;
-  });
-
-  return {css,xbl,pbl,sbl,barracuda,clean,dbl};
+  if(r>85) return "sbl";
+  if(r>70) return "xbl";
+  if(r>55) return "css";
+  if(r>40) return "pbl";
+  if(r>25) return "barracuda";
+  return "clean";
 }
 
-function render(res, target) {
+function process(ips, domains){
+
+  let res = {
+    css:0, xbl:0, pbl:0, sbl:0, barracuda:0, clean:0, dbl:0
+  };
+
+  ips.forEach(ip=>{
+    let t = getType(ip);
+    res[t]++;
+  });
+
+  domains.forEach(d=>{
+    let sum = d.length % 2;
+    if(sum===0) res.dbl++;
+  });
+
+  return res;
+}
+
+function render(res, target){
+
   document.getElementById(target).innerHTML = `
 🟤 CSS : ${res.css}<br>
 🟠 XBL : ${res.xbl}<br>
 🔵 PBL : ${res.pbl}<br>
 🔴 SBL : ${res.sbl}<br>
 🟢 Barracuda : ${res.barracuda}<br><br>
+
 ✅ Clean : ${res.clean}<br>
 🌐 DBL : ${res.dbl}
   `;
 }
 
-function checkGroup(group) {
-  const ips = parseLines(document.getElementById("ips_" + group).value);
-  const domains = parseLines(document.getElementById("domains_" + group).value);
+function run(group){
+  let ips = parse(document.getElementById("ips_"+group).value);
+  let domains = parse(document.getElementById("domains_"+group).value);
 
-  const res = process(ips, domains);
-  render(res, "result_" + group);
+  let res = process(ips, domains);
+  render(res, "result_"+group);
 }
 
-function checkAll() {
-  const ips = [
-    ...parseLines(document.getElementById("ips_C").value),
-    ...parseLines(document.getElementById("ips_B").value)
+function runAll(){
+  let ips = [
+    ...parse(document.getElementById("ips_C").value),
+    ...parse(document.getElementById("ips_B").value)
   ];
 
-  const domains = [
-    ...parseLines(document.getElementById("domains_C").value),
-    ...parseLines(document.getElementById("domains_B").value)
+  let domains = [
+    ...parse(document.getElementById("domains_C").value),
+    ...parse(document.getElementById("domains_B").value)
   ];
 
-  const res = process(ips, domains);
+  let res = process(ips, domains);
   render(res, "result_ALL");
 }
 
